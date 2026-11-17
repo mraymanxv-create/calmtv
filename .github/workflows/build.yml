@@ -1112,7 +1112,15 @@ jobs:
           cd src
           gradle assembleDebug --no-daemon
           cp app/calmtv.keystore phone/app/calmtv.keystore
-          (cd phone && gradle assembleDebug --no-daemon) || echo phone build failed
+          (cd phone && gradle assembleDebug --no-daemon 2>&1 | tee ../phone.log) || echo "::error title=PHONE BUILD FAILED::$(grep -E 'error:|What went wrong|FAILED' -A2 phone.log | head -12 | tr '\n' ' ')"
+          APK=phone/app/build/outputs/apk/debug/app-debug.apk
+          if [ -f $APK ]; then
+            BT=$(ls -d $ANDROID_HOME/build-tools/* 2>/dev/null | tail -1)
+            echo "::notice title=phone-apk::$(stat -c %s $APK) bytes; $($BT/aapt2 dump badging $APK 2>&1 | head -5 | tr '\n' ' ')"
+            echo "::notice title=phone-sign::$($BT/apksigner verify --verbose $APK 2>&1 | head -5 | tr '\n' ' ')"
+          else
+            echo "::error title=NO PHONE APK::phone apk missing"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: CalmTV-apk
